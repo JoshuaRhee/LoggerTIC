@@ -1,0 +1,6 @@
+# ignore DATA folder
+DATA/
+
+# ignore LOG folder
+LOG/
+
