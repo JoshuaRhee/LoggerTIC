@@ -1,6 +1,9 @@
-# ignore DATA folder
-DATA/
+# ignore outputs folder
+outputs/
 
-# ignore LOG folder
-LOG/
+# ignore files
+/.pytest_cache/
+/__pycache__/
+*.pyc
+
 

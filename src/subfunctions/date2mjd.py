@@ -1,18 +1,16 @@
-﻿import math
-def date2mjd(year, month, day):
+﻿def date2mjd(year, month, day):
     
-    flag_strOut = False
-
-    if isinstance(year, str):
+    ## Check inputs
+    if isinstance(year, str) and isinstance(month, str) and isinstance(day, str):
+        flag_strOut = True
         year = int(year)
-        flag_strOut = True
-    if isinstance(month, str):
         month = int(month)
-        flag_strOut = True
-    if isinstance(day, str):
         day = int(day)
-        flag_strOut = True
-
+    elif isinstance(year, int) and isinstance(month, int) and isinstance(day, int):
+        flag_strOut = False
+    else:
+        return None
+        
     if month == 1 or month == 2:
         yearp = year - 1
         monthp = month + 12
@@ -29,14 +27,14 @@ def date2mjd(year, month, day):
         B = 0
     else:
         # after start of Gregorian calendar
-        A = math.trunc(yearp / 100.)
-        B = 2 - A + math.trunc(A / 4.)
+        A = int(yearp / 100.)
+        B = 2 - A + int(A / 4.)
         
     if yearp < 0:
-        C = math.trunc((365.25 * yearp) - 0.75)
+        C = int((365.25 * yearp) - 0.75)
     else:
-        C = math.trunc(365.25 * yearp)
-    D = math.trunc(30.6001 * (monthp + 1))
+        C = int(365.25 * yearp)
+    D = int(30.6001 * (monthp + 1))
     
     jd = B + C + D + day + 1720994.5
     

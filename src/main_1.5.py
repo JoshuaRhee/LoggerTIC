@@ -1,31 +1,30 @@
 #######################################
 # Time Interval Counter Logger
 # Device: 53230A, 53131A, 53132A, SR620
-# Version: 1.4
-# * Debugging in logging limitation problem
+# Version: 1.5
+# * Restructured the package
 #######################################
 
-import os
 import configparser
-import pyvisa
 from datetime import datetime, timedelta
-from date2mjd import date2mjd
-import logging
-import logging.handlers
+import os
 from pytictoc import TicToc
+import pyvisa
+
+from subfunctions.apply_presets import apply_presets
+from subfunctions.date2mjd import date2mjd
+from subfunctions.make_logger import make_logger
 
 class Instrument:
-    ## CONSTRUCTOR
     def __init__(self, config_section, numInst):
         self.missed = 0
-        # try:
         self.flag_init = False
         self.config_section = config_section
         if config_section.has_section('INST'+str(numInst)):
             self.config = config_section['INST'+str(numInst)]
-            self.inst = self.connectInst(numInst)
+            self.inst = self.connect_inst(numInst)
             if self.inst:
-                if self.applyOptions(numInst):
+                if self.apply_options(numInst):
                     self.flag_init = True
                 else:
                     pass
@@ -33,13 +32,11 @@ class Instrument:
                 logger.error(f'@__init__: Both GPIB and TCPIP connection were failed for [INST{str(numInst)}].')
         else:
             pass
-        # except:
-        #     logger.critical('@__init__: Unexpected error occurred for [INST' + str(numInst) + '].')
 
     ## CONNECT TO THE INSTRUMENT
-    def connectInst(self, numInst):
+    def connect_inst(self, numInst):
         if not self.config_section.has_option('INST'+str(numInst), 'INTERFACE'):
-            logger.error('@connectInst: There is no INTERFACE option in section [INST' + str(numInst) + '].')
+            logger.error('@connect_inst: There is no INTERFACE option in section [INST' + str(numInst) + '].')
             return None
         else:
             if self.config['INTERFACE'] == 'TCPIP_INSTR':
@@ -50,10 +47,10 @@ class Instrument:
                     (f'TCPIP0::{IPaddr}::inst0::INSTR')
                     Instrument = rm.open_resource(f'TCPIP0::{IPaddr}::inst0::INSTR')
                     self.instModel = Instrument.query('*IDN?').split(',')[1]
-                    logger.info(f'@connectInst: Connect to TCPIP ({IPaddr}).')
+                    logger.info(f'@connect_inst: Connect to TCPIP ({IPaddr}).')
                     return Instrument
                 except:
-                    logger.error(f'@connectInst: Failed to connect to TCP/IP ({IPaddr}).')
+                    logger.error(f'@connect_inst: Failed to connect to TCP/IP ({IPaddr}).')
                     return None
             elif self.config['INTERFACE'] == 'TCPIP_SOCKET':
                 return None
@@ -65,21 +62,21 @@ class Instrument:
                     (f'GPIB0::{GPIBaddr}::INSTR')
                     Instrument = rm.open_resource(f'GPIB0::{GPIBaddr}::INSTR')
                     self.instModel = Instrument.query('*IDN?').split(',')[1]
-                    logger.info(f'@connectInst: Connected to GPIB ({GPIBaddr}).')
+                    logger.info(f'@connect_inst: Connected to GPIB ({GPIBaddr}).')
                     return Instrument
                 except:
-                    logger.error(f'@connectInst: Failed to connect to GPIB ({GPIBaddr}).')
+                    logger.error(f'@connect_inst: Failed to connect to GPIB ({GPIBaddr}).')
                     return None
             elif self.config['INTERFACE'] == 'SERIAL_INSTR':
                 return None
             elif self.config['INTERFACE'] == 'ENET-SERIAL_INSTR':
                 return None
             else:
-                logger.error('@connectInst: INTERFACE option is not appropriate.')
+                logger.error('@connect_inst: INTERFACE option is not appropriate.')
                 return None
 
     ## APPLY PRESET OPTIONS
-    def applyOptions(self, numInst):
+    def apply_options(self, numInst):
         try:
             # Check FILE_ID option
             if self.config_section.has_option('INST'+str(numInst), 'FILE_ID'):
@@ -98,100 +95,13 @@ class Instrument:
                 self.timestamp='SUP'
                 logger.warning('@initInst: No TIMESTAMP option in .ini file. Set SUP as a default.')
 
-            # Check other options
-            if self.instModel == '53230A':
-                self.inst.write('ABOR') # Abort (=quit) measuring if any exists.
-                self.inst.write('*RST') # Reset
-                self.inst.write('*CLS') # Clear the Status Byte Register
-                self.inst.write('DATA:POIN:EVEN:THR 1') #' + self.config['READCNT']) # Measurement count threshold is set to 1.
-                self.inst.write('STAT:OPER:ENAB 4096') # Relation between the event and Standard Operation Register. (If measurement count exceed the threshold, SOR is turned on.)
-                self.inst.write('*SRE 128') # Relation between the Status Byte Register and RQS (6th bit of SBR).
-                self.inst.write('ROSC:SOUR:AUTO ON') # Reference oscillator is automatically selected.
-                #self.inst.write('SYST:TIM 10')
-
-                if self.config['CONF'] == 'FREQ':
-                    self.inst.write(f"CONF:{self.config['CONF']} (@{self.config['CHAN']}")
-                elif self.config['CONF'] == 'TINT':
-                    self.inst.write(f"CONF:{self.config['CONF']} (@{self.config['CHAN'][0]}),(@{self.config['CHAN'][-1]})")
-                else:
-                    self.inst.write(f"CONF:{self.config['CONF']}")
-
-                self.inst.write('INP1:COUP ' + self.config['COUP1'])
-                self.inst.write('INP2:COUP ' + self.config['COUP2'])
-                if self.config['IMP1'] == 'HIGH' or self.config['IMP1'] == '1M':
-                    self.config['IMP1'] = '1E6'
-                self.inst.write('INP1:IMP ' + self.config['IMP1'])
-                if self.config['IMP2'] == 'HIGH' or self.config['IMP2'] == '1M':
-                    self.config['IMP2'] = '1E6'
-                self.inst.write('INP2:IMP ' + self.config['IMP2'])
-                self.inst.write('INP1:LEV ' + self.config['LEV1'])
-                self.inst.write('INP2:LEV ' + self.config['LEV2'])
-                self.inst.write('INP1:SLOP ' + self.config['SLO1'])
-                self.inst.write('INP2:SLOP ' + self.config['SLO2'])
-                self.inst.write('TRIG:COUN 1E6') # Set as maximum
-                self.inst.write('SAMP:COUN 1E6') # Set as maximum
-
-            elif self.instModel == '53132A' or self.instModel == '53131A':
-                self.inst.write('ABOR') # Abort (=quit) measuring if any exists.
-                self.inst.write('*RST') # Reset
-                self.inst.write('*CLS') # Clear the Status Byte Register
-                self.inst.write(':STAT:PRESet')
-                self.inst.write(':STAT:OPER:PTR 0; NTR 16') # Rule for detecting a negative transition (?)
-                self.inst.write(':STAT:OPER:ENAB 16') # Masking Operation Status Register to represent 4th bit(Measuring) only.
-                self.inst.write('*SRE 128')
-
-                self.inst.write('ROSC:SOUR:AUTO ON') # Reference oscillator is automatically selected.
-                self.inst.write('CONF:' + self.config['CONF'])
-                self.inst.write('INP1:COUP ' + self.config['COUP1'])
-                self.inst.write('INP2:COUP ' + self.config['COUP2'])
-                if self.config['IMP1'] == 'HIGH' or self.config['IMP1'] == '1M': self.config['IMP1'] = '1E6'
-                self.inst.write('INP1:IMP '+self.config['IMP1'])
-                if self.config['IMP2'] == 'HIGH' or self.config['IMP2'] == '1M': self.config['IMP2'] = '1E6'
-                self.inst.write('INP2:IMP '+self.config['IMP2'])
-                self.inst.write('SENS:EVEN1:LEV:AUTO OFF')
-                self.inst.write('SENS:EVEN2:LEV:AUTO OFF')
-                self.inst.write('SENS:EVEN1:LEV ' + self.config['LEV1'])
-                self.inst.write('SENS:EVEN2:LEV ' + self.config['LEV2'])
-                self.inst.write('SENS:EVEN1:SLOP ' + self.config['SLO1'])
-                self.inst.write('SENS:EVEN2:SLOP ' + self.config['SLO2'])
-
-            elif self.instModel == 'SR620':
-                self.inst.write('*RST')
-                self.inst.write('*CLS')
-                self.inst.write('TENA 4')
-                self.inst.write('SIZE 1')
-                self.inst.write('SRCE 0')
-                self.inst.write('*SRE 8')
-
-                if self.config['CONF'] == 'TINT':
-                    self.inst.write('MODE 0')
-                if self.config['COUP1'] == 'DC': self.inst.write('TCPL 1, 0')
-                elif self.config['COUP1'] == 'AC': self.inst.write('TCPL 1, 1')
-                else: raise Exception
-                if self.config['COUP2'] == 'DC': self.inst.write('TCPL 2, 0')
-                elif self.config['COUP2'] == 'AC': self.inst.write('TCPL 2, 1')
-                else: raise Exception
-                if self.config['IMP1'] == '50': self.inst.write('TERM 1, 0')
-                elif self.config['IMP1'] == '1E6' or self.config['IMP1'] == 'HIGH' or self.config['IMP1'] == '1M': self.inst.write('TERM 1, 1')
-                else: raise Exception
-                if self.config['IMP2'] == '50': self.inst.write('TERM 2, 0')
-                elif self.config['IMP1'] == '1E6' or self.config['IMP1'] == 'HIGH' or self.config['IMP1'] == '1M': self.inst.write('TERM 2, 1')
-                else: raise Exception
-                self.inst.write('LEVL 1, ' + self.config['LEV1'])
-                self.inst.write('LEVL 2, ' + self.config['LEV2'])
-                if self.config['SLO1']=='POS': self.inst.write('TSLP 1,0')
-                elif self.config['SLO1']=='NEG': self.inst.write('TSLP 1, 1')
-                else: raise Exception
-                if self.config['SLO2']=='POS': self.inst.write('TSLP 2,0')
-                elif self.config['SLO2']=='NEG': self.inst.write('TSLP 2, 1')
-                else: raise Exception
-
-            else:
-                logger.error('@applyOptions: Unexpected model name.')
+            # Apply other specific options with queries
+            if apply_presets(self) is None:
+                logger.error('@apply_options: Unexpected model name.')
                 return False
             return True
         except:
-            logger.error('@applyOptions: Problem occured while reading .ini file.')
+            logger.error('@apply_options: Problem occured while reading .ini file.')
             return False
 
     ## INITIATE MEASURING
@@ -218,9 +128,10 @@ class Instrument:
             stb = format(self.inst.stb, '08b')
             logger.debug('@check: STB is ' + stb)
 
-            if stb[0] == '1' or True:# Number of the measurements is reached to the threshold (=READCNT).
+            if stb[0] == '1' or True:# or True # Number of the measurements is reached to the threshold (=READCNT).
                 logger.debug('@check: STB[0] detected. (Measurement queue)')
                 self.send_CLS()
+                #self.send_READ()
                 self.send_R()
                 stb0 = True
             else:
@@ -238,7 +149,7 @@ class Instrument:
             if (not stb0) and (not stb5):
                 logger.debug('@check: No STB detected.')
                 self.missed += 1
-                if self.missed > 2:
+                if self.missed > 30:
                     pass#print('PAUSE!')
             else:
                 self.missed = 0
@@ -291,7 +202,7 @@ class Instrument:
     
     ## SEND A QUERY OR AN INSTRUCTION AND TREAT THE ANSWERS APPROPRIATELY
     def send_R(self):
-        fileName = 'DATA/MEAS_'+self.instID+'_'+datetime.utcnow().strftime('%y%m%d')+'.txt'
+        fileName = 'outputs/measurements/MEAS_'+self.instID+'_'+datetime.utcnow().strftime('%y%m%d')+'.txt'
         if not os.path.exists(os.path.dirname(fileName)):
             os.makedirs(os.path.dirname(fileName))
         
@@ -326,7 +237,26 @@ class Instrument:
                 else:
                     logger.warning('* Return from ' + self.instID + ' is empty.')
             else:
-                logger.warning('< Received unexpected answer on:'+ t.strftime('%y/%m/%d %H:%M:%S.%f'))
+                logger.warning('< Received unexpected answer on:'+ t_rcv.strftime('%y/%m/%d %H:%M:%S.%f'))
+
+    def send_READ(self):
+        fileName = 'outputs/measurements/MEAS_'+self.instID+'_'+datetime.utcnow().strftime('%y%m%d')+'.txt'
+        if not os.path.exists(os.path.dirname(fileName)):
+            os.makedirs(os.path.dirname(fileName))
+            
+        with open(fileName, 'a+') as f:
+            if os.stat(fileName).st_size == 0:
+                self.write_header(f)
+            logger.info('> Sent an READ? query to ' + self.instID + ' on:    ' + datetime.utcnow().strftime('%y/%m/%d %H:%M:%S.%f'))
+            ans = self.inst.query('READ?') # 데이터 쿼리 요청
+            t_rcv = datetime.utcnow()
+            #if ans[0] == '#':
+            logger.info('< Received an answer from ' + self.instID + ' on: ' + t_rcv.strftime('%y/%m/%d %H:%M:%S.%f'))
+            logger.info('* Return from ' + self.instID + ' = ' + ans[:-1])
+            f.write(date2mjd(t_rcv.strftime('%Y'), t_rcv.strftime('%m'), t_rcv.strftime('%d')) + ' ' + t_rcv.strftime('%H:%M:%S') + ' ' + t_rcv.strftime('%f')[0:2] + ' ') # 리턴 시각 기록
+            f.write(ans[ans.find('+'):ans.find('E')+5]+'\n') # 리턴 내용 기록
+            #else:
+            #    logger.warning('< Received unexpected answer on:'+ t_rcv.strftime('%y/%m/%d %H:%M:%S.%f'))
 
     def send_ERR(self):
         while format(self.inst.stb, '08b')[5] == '1':
@@ -342,7 +272,7 @@ class Instrument:
         #     pass
 
     def send_DATA(self):
-        fileName = 'DATA/MEAS_'+self.instID+'_'+datetime.utcnow().strftime('%y%m%d')+'.txt'
+        fileName = 'outputs/measurements/MEAS_'+self.instID+'_'+datetime.utcnow().strftime('%y%m%d')+'.txt'
         if not os.path.exists(os.path.dirname(fileName)):
             os.makedirs(os.path.dirname(fileName))
         with open(fileName,'a+') as f:
@@ -357,7 +287,7 @@ class Instrument:
             f.write(ans[ans.find('+'):ans.find('E')+5]+'\n') # 리턴 내용 기록
 
     def send_XAVG(self):
-        fileName = 'DATA/MEAS_'+self.instID+'_'+datetime.utcnow().strftime('%y%m%d')+'.txt'
+        fileName = 'outputs/measurements/MEAS_'+self.instID+'_'+datetime.utcnow().strftime('%y%m%d')+'.txt'
         if not os.path.exists(os.path.dirname(fileName)):
             os.makedirs(os.path.dirname(fileName))
         with open(fileName,'a+') as f:
@@ -393,33 +323,6 @@ class Instrument:
         f.write('Ch2 = '+self.config['COUP2']+' / '+self.config['IMP2']+' / '+self.config['LEV2']+' / '+self.config['SLO2']+'\n')
         f.write('\n')
         f.write('MJD HH:mm:ss MEASUREMENT\n')
-
-def make_logger():
-    logger = logging.getLogger(None)
-
-    logger.setLevel(logging.DEBUG)
-    formatter = logging.Formatter('%(asctime)s - %(lineno)s - %(levelname)s - %(message)s')
-    
-    console = logging.StreamHandler()
-
-    current_dir = os.path.dirname(os.path.realpath(__file__))
-    log_dir = '{}/LOG'.format(current_dir)
-    if not os.path.exists(log_dir):
-        os.makedirs(log_dir)
-    LOG_FILENAME = 'LOG/log'
-    file_handler = logging.handlers.TimedRotatingFileHandler(filename=LOG_FILENAME, when='midnight',interval=1, encoding='utf-8', utc=True)
-    file_handler.suffix = '%y%m%d.log'
-
-    console.setLevel(logging.INFO)
-    file_handler.setLevel(logging.INFO)
-
-    console.setFormatter(formatter)
-    file_handler.setFormatter(formatter)
-
-    logger.addHandler(console)
-    logger.addHandler(file_handler)
-
-    return logger
 
 def initInst():
     MyInst = []
@@ -478,7 +381,7 @@ def initInst():
                 if MyInst[-1].start() is False:
                     logger.error(f'@initInst: Failed to start MyInst[{str(i)}].')
         else:
-            MyInst.append(None)
+            pass#MyInst.append(None)
     return (MyInst, sel_list, qint)
 
 def measInst(MyInst, sel_list, qint):
