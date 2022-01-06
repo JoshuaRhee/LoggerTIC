@@ -35,10 +35,8 @@ def apply_presets(inst):
             inst.inst.write('INP2:LEV ' + inst.config['LEV2'])
             inst.inst.write('INP1:SLOP ' + inst.config['SLO1'])
             inst.inst.write('INP2:SLOP ' + inst.config['SLO2'])
-            #inst.inst.write('TRIG:SOUR IMM')
-            inst.inst.write('SAMP:COUN 1E6') # Set as maximum
-            
-            
+            inst.inst.write('TRIG:COUN ' + inst.config['TRIGGER_COUNT'])
+            inst.inst.write('SAMP:COUN ' + inst.config['SAMPLE_COUNT'])
             
     elif inst.instModel == '53132A' or inst.instModel == '53131A':
         inst.inst.write('ABOR') # Abort (=quit) measuring if any exists.

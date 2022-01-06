@@ -125,34 +125,33 @@ class Instrument:
     ## CHECK REGISTERS AND DO TASKS
     def check(self, reg_prev):
         if self.instModel == '53230A':
-            stb = format(self.inst.stb, '08b')
-            logger.debug('@check: STB is ' + stb)
+            reg_to_check = format(int(self.inst.query('STAT:OPER:COND?')[1:-1]), '016b')
+            logger.debug('@check: STAT:OPER:COND is ' + reg_to_check)
 
-            if stb[0] == '1' or True:# or True # Number of the measurements is reached to the threshold (=READCNT).
-                logger.debug('@check: STB[0] detected. (Measurement queue)')
+            if reg_to_check[-13] == '1':# or True # Number of the measurements is reached to the threshold (=READCNT).
+                logger.debug('@check: STAT:OPER:COND[-13] is detected.')
                 self.send_CLS()
                 #self.send_READ()
                 self.send_R()
-                stb0 = True
             else:
-                stb0 = False
-            if stb[5] == '1': # Errors exist.
-                logger.debug('@check: STB[5] detected. (Error queue)')
-                self.send_CLS()
-                self.send_ERR()
-                stb5 = True
-            else:
-                stb5 = False
+                pass
+            # if stb[5] == '1': # Errors exist.
+            #     logger.debug('@check: STB[5] detected. (Error queue)')
+            #     self.send_CLS()
+            #     self.send_ERR()
+            #     stb5 = True
+            # else:
+            #     stb5 = False
                 
-            reg_prev = self.comp_reg(reg_prev, stb)
+            # reg_prev = self.comp_reg(reg_prev, stb)
             
-            if (not stb0) and (not stb5):
-                logger.debug('@check: No STB detected.')
-                self.missed += 1
-                if self.missed > 30:
-                    pass#print('PAUSE!')
-            else:
-                self.missed = 0
+            # if (not stb0) and (not stb5):
+            #     logger.debug('@check: No STB detected.')
+            #     self.missed += 1
+            #     if self.missed > 30:
+            #         pass#print('PAUSE!')
+            # else:
+            #     self.missed = 0
 
         elif self.instModel == '53132A' or self.instModel == '53131A':
             stb = format(self.inst.stb, '08b')
