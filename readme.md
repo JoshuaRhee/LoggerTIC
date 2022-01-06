@@ -1,15 +1,20 @@
-# 프로그램 이름
-### 개요 프로그램에 대한 간단한 소개
-### 설치 방법 해당 프로그램을 설치하는 방법에 대한 소개
-파이썬 패키지의 경우 pip install 내용 작성
+# Time Interval Counter Logger (TIC Logger)
+### Objects
+Log and store measurements from various time interval counters.
 
-### 실행 방법
-해당 프로그램의 각 기능별 사용 방법 소개
-실행 예시와 결과도 포함하면 더 좋음
+### Affordable TICs
+- Keysight 53230A
+- Keysight 53132A
+- Keysight 53131A
+- Stanford Research Systems SR620
 
-### 참고 사항
-해당 프로그램 관한 참고 사항
-- 개발 관련 문서 URL
-- 외부 참고 문서 URL
-- 향후 일정 관련 내용
-- 오류 관련 Known-issue
+### Available functions
+- Measuring frequency of ch1 or ch2.
+- Measuring time interval between ch1 and ch2.
+
+### How to run
+1. Set main_1.5.ini file in src folder.
+2. Run main_1.5.py file.
+
+### How to fix
+- To modify SCPI instructions, change apply_presets.py in src/subfunctions folder.
