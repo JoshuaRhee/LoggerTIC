@@ -376,9 +376,11 @@ def initInst():
             MyInst.append(Instrument(config,i))
             if MyInst[-1].flag_init is False:
                 logger.error(f'@initInst: Failed to initialize MyInst[{str(i)}].')
+                return ([], sel_list, qint)
             else:
                 if MyInst[-1].start() is False:
                     logger.error(f'@initInst: Failed to start MyInst[{str(i)}].')
+                    return ([], sel_list, qint)
         else:
             pass#MyInst.append(None)
     return (MyInst, sel_list, qint)
@@ -393,7 +395,7 @@ def measInst(MyInst, sel_list, qint):
 
         while True:
             #logger.info('====================================================================================================================================================')
-            reg_prev = MyInst[0].comp_reg(reg_prev, format(MyInst[0].inst.stb, '08b'))
+            #reg_prev = MyInst[0].comp_reg(reg_prev, format(MyInst[0].inst.stb, '08b'))
             if t.tocvalue() > qint:
                 logger.debug('@measInst: Measurement loop is started.')
                 t.tic()
@@ -425,7 +427,7 @@ if __name__ == '__main__':
 
     ## Eternal loop that checks STB and saves measurements
     if all(x.inst is None for x in MyInst):
-        logger.error('@initInst: All instruments are not available.')
+        logger.error('@initInst: Measurement is not started due to the fail in initialization.')
     else:
         measInst(MyInst, sel_list, qint)
     print('Done')
