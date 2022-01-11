@@ -14,6 +14,7 @@ import pyvisa
 from subfunctions.apply_presets import apply_presets
 from subfunctions.date2mjd import date2mjd
 from subfunctions.make_logger import make_logger
+from subfunctions.write_header import write_header
 
 class Instrument:
     def __init__(self, config_section, numInst):
@@ -207,7 +208,7 @@ class Instrument:
         
         with open(fileName, 'a+') as f:
             if os.stat(fileName).st_size == 0:
-                self.write_header(f)
+                write_header(self,f)
             logger.info('> Sent an R? query to ' + self.instID + ' on:    ' + datetime.utcnow().strftime('%y/%m/%d %H:%M:%S.%f'))
             ans = self.inst.query('R?') # 데이터 쿼리 요청
             t_rcv = datetime.utcnow()
@@ -245,7 +246,7 @@ class Instrument:
             
         with open(fileName, 'a+') as f:
             if os.stat(fileName).st_size == 0:
-                self.write_header(f)
+                write_header(self,f)
             logger.info('> Sent an READ? query to ' + self.instID + ' on:    ' + datetime.utcnow().strftime('%y/%m/%d %H:%M:%S.%f'))
             ans = self.inst.query('READ?') # 데이터 쿼리 요청
             t_rcv = datetime.utcnow()
@@ -276,7 +277,7 @@ class Instrument:
             os.makedirs(os.path.dirname(fileName))
         with open(fileName,'a+') as f:
             if os.stat(fileName).st_size == 0:
-                self.write_header(f)
+                write_header(self,f)
             logger.info('> Sent an DATA? query to ' + self.instID + ' on: ' + datetime.utcnow().strftime('%y/%m/%d %H:%M:%S.%f'))
             ans = self.inst.query('DATA?') # 데이터 쿼리 요청
             t_rcv = datetime.utcnow()
@@ -291,7 +292,7 @@ class Instrument:
             os.makedirs(os.path.dirname(fileName))
         with open(fileName,'a+') as f:
             if os.stat(fileName).st_size == 0:
-                self.write_header(f)
+                write_header(self,f)
             logger.info('> Sent an XAVG? query to ' + self.instID + ' on: ' + datetime.utcnow().strftime('%y/%m/%d %H:%M:%S.%f'))
             ans = self.inst.query('XAVG?') # 데이터 쿼리 요청
             t_rcv = datetime.utcnow()
@@ -307,21 +308,6 @@ class Instrument:
         except:
             pass
         logger.info('* RAISED AN INTENTIONAL ERROR.')
-
-    def write_header(self, f):
-        f.write('<GPIB LOGGER OUTPUT>\n')
-        datestr = datetime.utcnow().strftime('%Y%m%d')
-        f.write('Date = ' + datestr + ' (UTC)\n')
-        f.write('MJD = ' + date2mjd(datestr[0:4], datestr[4:6], datestr[6:8]) + '\n')
-        f.write('DOY = ' + str(datetime.utcnow().timetuple().tm_yday) + '\n')
-        f.write('TimeTag = UTC\n')
-        f.write('FILE_ID = ' + self.config['FILE_ID'] + '\n')
-        f.write('IDN = ' + self.inst.query('*IDN?'))
-        f.write('Configuration = ' + self.config['CONF']+'\n')
-        f.write('Ch1 = '+self.config['COUP1']+' / '+self.config['IMP1']+' / '+self.config['LEV1']+' / '+self.config['SLO1']+'\n')
-        f.write('Ch2 = '+self.config['COUP2']+' / '+self.config['IMP2']+' / '+self.config['LEV2']+' / '+self.config['SLO2']+'\n')
-        f.write('\n')
-        f.write('MJD HH:mm:ss MEASUREMENT\n')
 
 def initInst():
     MyInst = []
