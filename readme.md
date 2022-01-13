@@ -1,20 +1,21 @@
 # Time Interval Counter Logger (TIC Logger)
-### Objects
+## Objects
 Log and store measurements from various time interval counters.
 
-### Affordable TICs
+## Supported TICs
 - Keysight 53230A
 - Keysight 53132A
 - Keysight 53131A
 - Stanford Research Systems SR620
 
-### Available functions
+## Available measurement configurations
 - Measuring frequency of ch1 or ch2.
 - Measuring time interval between ch1 and ch2.
 
-### How to run
-1. Set main_1.5.ini file in src folder.
-2. Run main_1.5.py file.
+## How to run the program
+1. Modify src/main.ini file.
+2. Run src/main.py file.
+3. Check outputs/measurements/ or outputs/logs/.
 
-### How to fix
+## How to modify for more queries/instructions
 - To modify SCPI instructions, change apply_presets.py in src/subfunctions folder.
