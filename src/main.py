@@ -1,25 +1,27 @@
 #######################################
 # Time Interval Counter Logger
 # Device: 53230A, 53131A, 53132A, SR620
-# Version: 1.5
-# * Restructured the package
+# Version: 1.6
+# Modified apply_presets
+# Merged write_header to apply_presets
+# Modified meas. file header format
+# Added infinite option for 53230A
 #######################################
 
 import configparser
 from datetime import datetime, timedelta
-import os
-from pytictoc import TicToc
-import pyvisa
-
 from subfunctions.apply_presets import apply_presets
 from subfunctions.date2mjd import date2mjd
 from subfunctions.make_logger import make_logger
-from subfunctions.write_header import write_header
+import os
+from pytictoc import TicToc
+import pyvisa
 
 class Instrument:
     def __init__(self, config_section, numInst):
         self.missed = 0
         self.flag_init = False
+        self.flag_infinite = False
         self.config_section = config_section
         if config_section.has_section('INST'+str(numInst)):
             self.config = config_section['INST'+str(numInst)]
@@ -83,7 +85,7 @@ class Instrument:
             if self.config_section.has_option('INST'+str(numInst), 'FILE_ID'):
                 self.instID = self.config['FILE_ID']
             else:
-                logger.error(f'@__init__: There is no FILE_ID option in a section [INST{str(numInst)}].')
+                logger.error(f'@apply_options: There is no FILE_ID option in a section [INST{str(numInst)}].')
                 return False
 
             # Check TIMESTAMP option
@@ -91,16 +93,18 @@ class Instrument:
                 self.timestamp = self.config['TIMESTAMP']
                 if self.timestamp not in ['SUP','DUP','SER']:
                     self.timestamp='SUP'
-                    logger.warning('@initInst: Improper TIMETAG option in .ini file. Set SUP as a default.')
+                    logger.warning('@apply_options: Improper TIMETAG option in .ini file. Set SUP as a default.')
             else:
                 self.timestamp='SUP'
-                logger.warning('@initInst: No TIMESTAMP option in .ini file. Set SUP as a default.')
+                logger.warning('@apply_options: No TIMESTAMP option in .ini file. Set SUP as a default.')
 
             # Apply other specific options with queries
-            if apply_presets(self) is None:
-                logger.error('@apply_options: Unexpected model name.')
+            return_apply_presets = apply_presets(self)
+            if return_apply_presets == 'Done':
+                return True
+            else:
+                logger.error('@apply_presets: ' + return_apply_presets)
                 return False
-            return True
         except:
             logger.error('@apply_options: Problem occured while reading .ini file.')
             return False
@@ -124,7 +128,7 @@ class Instrument:
         return self.flag_start
 
     ## CHECK REGISTERS AND DO TASKS
-    def check(self, reg_prev):
+    def check(self, cnt_check):
         if self.instModel == '53230A':
             reg_to_check = format(int(self.inst.query('STAT:OPER:COND?')[1:-1]), '016b')
             logger.debug('@check: STAT:OPER:COND is ' + reg_to_check)
@@ -134,6 +138,11 @@ class Instrument:
                 self.send_CLS()
                 #self.send_READ()
                 self.send_R()
+                if self.flag_infinite is True and cnt_check > 1E8:
+                    self.inst.write('ABOR')
+                    self.inst.write('INIT')
+                    logger.info('@check: Device is re-initialized for the infinite mode.')
+                    return True, True
             else:
                 pass
             # if stb[5] == '1': # Errors exist.
@@ -144,8 +153,6 @@ class Instrument:
             # else:
             #     stb5 = False
                 
-            # reg_prev = self.comp_reg(reg_prev, stb)
-            
             # if (not stb0) and (not stb5):
             #     logger.debug('@check: No STB detected.')
             #     self.missed += 1
@@ -173,7 +180,7 @@ class Instrument:
                 logger.debug('@check: No STB detected.')
         else:
             logger.error('@check: Unexpected model name.')
-        return True, reg_prev
+        return True, False
 
     def comp_reg(self, reg_prev, stb):
         reg_STB = f"{int(self.inst.query('*STB?')[1:-1]):b}".zfill(8)
@@ -203,19 +210,17 @@ class Instrument:
     ## SEND A QUERY OR AN INSTRUCTION AND TREAT THE ANSWERS APPROPRIATELY
     def send_R(self):
         fileName = 'outputs/measurements/MEAS_'+self.instID+'_'+datetime.utcnow().strftime('%y%m%d')+'.txt'
-        if not os.path.exists(os.path.dirname(fileName)):
-            os.makedirs(os.path.dirname(fileName))
-        
         with open(fileName, 'a+') as f:
-            if os.stat(fileName).st_size == 0:
-                write_header(self,f)
             logger.info('> Sent an R? query to ' + self.instID + ' on:    ' + datetime.utcnow().strftime('%y/%m/%d %H:%M:%S.%f'))
             ans = self.inst.query('R?') # 데이터 쿼리 요청
             t_rcv = datetime.utcnow()
             if ans[0] == '#':
                 logger.info('< Received an answer from ' + self.instID + ' on: ' + t_rcv.strftime('%y/%m/%d %H:%M:%S.%f'))
                 if '#10' not in ans:
-                    logger.info('* Return from ' + self.instID + ' = ' + ans[:100])#ans[:-1])
+                    if len(ans) > 100:
+                        logger.info('* Return from ' + self.instID + ' = ' + ans[:95] + ' ... ')#ans[:-1])
+                    else:
+                        logger.info('* Return from ' + self.instID + ' = ' + ans[:-1])#ans[:-1])
                     N_comma = ans.count(',')
                     if self.timestamp == 'SUP':
                         f.write(date2mjd(t_rcv.strftime('%Y'), t_rcv.strftime('%m'), t_rcv.strftime('%d')) + ' ' + t_rcv.strftime('%H:%M:%S') + ' ' + t_rcv.strftime('%f')[0:2] + ' ') # 리턴 시각 기록
@@ -241,12 +246,7 @@ class Instrument:
 
     def send_READ(self):
         fileName = 'outputs/measurements/MEAS_'+self.instID+'_'+datetime.utcnow().strftime('%y%m%d')+'.txt'
-        if not os.path.exists(os.path.dirname(fileName)):
-            os.makedirs(os.path.dirname(fileName))
-            
         with open(fileName, 'a+') as f:
-            if os.stat(fileName).st_size == 0:
-                write_header(self,f)
             logger.info('> Sent an READ? query to ' + self.instID + ' on:    ' + datetime.utcnow().strftime('%y/%m/%d %H:%M:%S.%f'))
             ans = self.inst.query('READ?') # 데이터 쿼리 요청
             t_rcv = datetime.utcnow()
@@ -273,11 +273,7 @@ class Instrument:
 
     def send_DATA(self):
         fileName = 'outputs/measurements/MEAS_'+self.instID+'_'+datetime.utcnow().strftime('%y%m%d')+'.txt'
-        if not os.path.exists(os.path.dirname(fileName)):
-            os.makedirs(os.path.dirname(fileName))
         with open(fileName,'a+') as f:
-            if os.stat(fileName).st_size == 0:
-                write_header(self,f)
             logger.info('> Sent an DATA? query to ' + self.instID + ' on: ' + datetime.utcnow().strftime('%y/%m/%d %H:%M:%S.%f'))
             ans = self.inst.query('DATA?') # 데이터 쿼리 요청
             t_rcv = datetime.utcnow()
@@ -288,11 +284,7 @@ class Instrument:
 
     def send_XAVG(self):
         fileName = 'outputs/measurements/MEAS_'+self.instID+'_'+datetime.utcnow().strftime('%y%m%d')+'.txt'
-        if not os.path.exists(os.path.dirname(fileName)):
-            os.makedirs(os.path.dirname(fileName))
         with open(fileName,'a+') as f:
-            if os.stat(fileName).st_size == 0:
-                write_header(self,f)
             logger.info('> Sent an XAVG? query to ' + self.instID + ' on: ' + datetime.utcnow().strftime('%y/%m/%d %H:%M:%S.%f'))
             ans = self.inst.query('XAVG?') # 데이터 쿼리 요청
             t_rcv = datetime.utcnow()
@@ -373,21 +365,22 @@ def initInst():
 
 def measInst(MyInst, sel_list, qint):
     try:
+        cnt_check = 1
         cnt_serial_failures = 0
         t = TicToc()
         t.tic()
         logger.debug('@measInst: Measurement loop is started.')
-        reg_prev = ''.rjust(149)
 
         while True:
-            #logger.info('====================================================================================================================================================')
-            #reg_prev = MyInst[0].comp_reg(reg_prev, format(MyInst[0].inst.stb, '08b'))
             if t.tocvalue() > qint:
                 logger.debug('@measInst: Measurement loop is started.')
                 t.tic()
                 for i in sel_list:
                     if MyInst[int(i)] is not None and MyInst[int(i)].flag_start:
-                        flag_OK, reg_prev = MyInst[int(i)].check(reg_prev)
+                        flag_OK, flag_reset_cnt = MyInst[int(i)].check(cnt_check)
+                        cnt_check += 1
+                        if flag_reset_cnt:
+                            cnt_check = 1
                         cnt_serial_failures = 0
                     else:
                         cnt_serial_failures += 1
