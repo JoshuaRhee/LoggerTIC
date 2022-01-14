@@ -13,7 +13,7 @@ def apply_presets(myInst):
         myInst.inst.write('STAT:OPER:ENAB 4096') # Relation between the event and Standard Operation Register. (If measurement count exceed the threshold, SOR is turned on.)
         myInst.inst.write('*SRE 128') # Relation between the Status Byte Register and RQS (6th bit of SBR).
         myInst.inst.write('ROSC:SOUR:AUTO ON') # Reference oscillator is automatically selected.
-        #inst.inst.write('SYST:TIM 10')
+        myInst.inst.write('SYST:TIMeout INF')
 
         if not myInst.config_section.has_option(myInst.config.name, 'CONF'):
             return 'There is no CONF option in section ' + myInst.config.name

@@ -317,18 +317,24 @@ def initInst():
     if config.has_option('GENERAL_OPTIONS', 'SELECT_INST'):
         sel_list_opt = config.get('GENERAL_OPTIONS', 'SELECT_INST')
         if sel_list_opt == 'ALL':
-            sel_list = [format(x, 'd') for x in range(N_SECTION)]
+            sel_id_list = [format(x, 'd') for x in range(N_SECTION)]
         else:
-            sel_list = sel_list_opt.split(',')
-            for i in sel_list:
-                if config.has_section(f'INST{i}'):
-                    pass
-                else:
-                    logger.error('@initInst: SELECT_INST option in .ini file does not match with the section names.')
-                    return (None, [], None)
+            sel_id_list = sel_list_opt.split(',')
+            sel_section_list = []
+            for sel_id in sel_id_list:
+                for section_name in config.sections()[1:]:
+                    if sel_id == config.get(section_name, 'FILE_ID'):
+                        sel_section_list.append(int(section_name[4:]))
+                    else:
+                        pass
+            if len(sel_id_list) != len(sel_section_list):
+                logger.error('@initInst: Some FILE_ID in the SELECT_INST option in .ini file does not match to any section.')
+                return (None, [], None)
+            else:
+                pass
     else:
         logger.info('@initInst: No SELECT_INST option in .ini file. Set ALL as a default.')
-        sel_list = [format(x, 'd') for x in range(N_SECTION)]
+        sel_id_list = [format(x, 'd') for x in range(N_SECTION)]
 
     ## GENERAL OPTION : SET LOG LEVEL
     if config.has_option('GENERAL_OPTIONS', 'LOG_LEVEL'):
@@ -350,20 +356,20 @@ def initInst():
 
     ## INITIALIZE INSTRUMENTS
     for i in range(int(N_SECTION)): # SECTION NUMBERS HAVE TO BE SERIAL.
-        if str(i) in sel_list:
+        if i in sel_section_list:
             MyInst.append(Instrument(config,i))
             if MyInst[-1].flag_init is False:
                 logger.error(f'@initInst: Failed to initialize MyInst[{str(i)}].')
-                return ([], sel_list, qint)
+                return ([], sel_id_list, qint)
             else:
                 if MyInst[-1].start() is False:
                     logger.error(f'@initInst: Failed to start MyInst[{str(i)}].')
-                    return ([], sel_list, qint)
+                    return ([], sel_id_list, qint)
         else:
             pass#MyInst.append(None)
-    return (MyInst, sel_list, qint)
+    return (MyInst, sel_section_list, qint)
 
-def measInst(MyInst, sel_list, qint):
+def measInst(MyInst, sel_section_list, qint):
     try:
         cnt_check = 1
         cnt_serial_failures = 0
@@ -375,7 +381,7 @@ def measInst(MyInst, sel_list, qint):
             if t.tocvalue() > qint:
                 logger.debug('@measInst: Measurement loop is started.')
                 t.tic()
-                for i in sel_list:
+                for i in sel_section_list:
                     if MyInst[int(i)] is not None and MyInst[int(i)].flag_start:
                         flag_OK, flag_reset_cnt = MyInst[int(i)].check(cnt_check)
                         cnt_check += 1
@@ -402,11 +408,11 @@ if __name__ == '__main__':
     logger = make_logger()
 
     ## Initiate instruments and start measuring
-    (MyInst, sel_list, qint) = initInst()
+    (MyInst, sel_section_list, qint) = initInst()
 
     ## Eternal loop that checks STB and saves measurements
     if all(x.inst is None for x in MyInst):
         logger.error('@initInst: Measurement is not started due to the fail in initialization.')
     else:
-        measInst(MyInst, sel_list, qint)
+        measInst(MyInst, sel_section_list, qint)
     print('Done')
