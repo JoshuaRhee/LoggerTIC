@@ -1,12 +1,11 @@
 #######################################
 # Time Interval Counter Logger
 # Device: 53230A, 53131A, 53132A, SR620
-# Version: 1.6.1
+# Version: 1.6
 # Modified apply_presets
 # Merged write_header to apply_presets
 # Modified meas. file header format
 # Added infinite option for 53230A
-# * Dummy rejection in DUP option
 #######################################
 
 import configparser
@@ -231,14 +230,14 @@ class Instrument:
                         f.write(lastOne + '\n')
                     else:
                         for i in range(N_comma+1):
+                            t_write = t_rcv + timedelta(seconds = i-N_comma)
+                            if self.timestamp == 'DUP':
+                                f.write(date2mjd(t_rcv.strftime('%Y'), t_rcv.strftime('%m'), t_rcv.strftime('%d')) + ' ' + t_rcv.strftime('%H:%M:%S') + ' ' + t_rcv.strftime('%f')[0:2] + ' ') # 리턴 시각 기록
+                            elif self.timestamp == 'SER':
+                                f.write(date2mjd(t_write.strftime('%Y'), t_write.strftime('%m'), t_write.strftime('%d')) + ' ' + t_write.strftime('%H:%M:%S') + ' ' + t_rcv.strftime('%f')[0:2] + ' ') # 리턴 시각 기록
                             firstOne = ans[ans.find('+'):ans.find('E')+5]
-                            if firstOne != '+9.91000000000000E+037':
-                                t_write = t_rcv + timedelta(seconds = i-N_comma)
-                                if self.timestamp == 'DUP':
-                                    f.write(date2mjd(t_rcv.strftime('%Y'), t_rcv.strftime('%m'), t_rcv.strftime('%d')) + ' ' + t_rcv.strftime('%H:%M:%S') + ' ' + t_rcv.strftime('%f')[0:2] + ' ') # 리턴 시각 기록
-                                elif self.timestamp == 'SER':
-                                    f.write(date2mjd(t_write.strftime('%Y'), t_write.strftime('%m'), t_write.strftime('%d')) + ' ' + t_write.strftime('%H:%M:%S') + ' ' + t_rcv.strftime('%f')[0:2] + ' ') # 리턴 시각 기록
-                                f.write(firstOne + '\n')
+                            #f.write(firstOne+' [' +t_rcv.strftime('%H:%M:%S %f')[:-4]+', ' + str(N_comma+1) + ']\n') # 리턴 내용 기록
+                            f.write(firstOne + '\n')
                             ans = ans[ans.find(',')+1:]
                 else:
                     logger.warning('* Return from ' + self.instID + ' is empty.')
