@@ -23,15 +23,16 @@ def apply_presets(myInst):
                 return 'There is no CHAN option in section ' + myInst.config.name
             else:
                 chans = myInst.config['CHAN']
-                myInst.inst.write(f"CONF:{myInst.config['CONF']} (@{chans}")
+                myInst.inst.write(f"CONF:{myInst.config['CONF']} (@{chans})")
                 str_header += 'Configure/Ch = ' + myInst.config['CONF'] + ' ' + myInst.config['CHAN'] + '\n'
                 
             # Default gap-free measurements settings from the manual
             myInst.inst.write('TRIG:COUN 1')
+            myInst.inst.write('SAMP:COUN 1E6')
             myInst.inst.write('FREQ:MODE CONT')
             myInst.inst.write('SENS:FREQ:GATE:SOUR TIME')
             myInst.inst.write('SENS:FREQ:GATE:TIME 1')
-            str_header += 'Meas Setting = Gap-free mode' + '\n'
+            str_header += 'Meas Setting = Gap-free mode. TRIG:COUN 1/SAMP:COUN 1E6' + '\n'
             
         elif myInst.config['CONF'] == 'TINT':
             if not myInst.config_section.has_option(myInst.config.name, 'CHAN'):
@@ -42,7 +43,6 @@ def apply_presets(myInst):
                 myInst.inst.write(f"CONF:{myInst.config['CONF']} (@{chans[0]}),(@{chans[-1]})")
                 str_header += 'Configure/Ch = ' + myInst.config['CONF'] + '/' + myInst.config['CHAN'] + '\n'
 
-            
             if not myInst.config_section.has_option(myInst.config.name, 'TRIGGER_COUNT'):
                 myInst.inst.write(f"TRIG:COUN 1E6")
                 trig_coun = '1E6'
@@ -59,12 +59,11 @@ def apply_presets(myInst):
                 myInst.inst.write(f"SAMP:COUN {myInst.config['SAMPLE_COUNT']}")
                 samp_coun = myInst.config['SAMPLE_COUNT']
             str_header += 'Meas Setting = TRIG:COUN ' + trig_coun + '/SAMP:COUN ' + samp_coun + '\n'
-            
-            if trig_coun == '1E6' and samp_coun == '1E6':
-                myInst.flag_infinite = True
-                
         else:
             myInst.inst.write(f"CONF:{myInst.config['CONF']}")
+
+        # if trig_coun == '1E6' and samp_coun == '1E6': should be modified..
+        myInst.flag_infinite = True
             
         for chan in chans:
             str_header += 'CH' + chan + '  Setting = '
@@ -91,7 +90,7 @@ def apply_presets(myInst):
             if not myInst.config_section.has_option(myInst.config.name, 'SLO'+chan):
                 return f'There is no SLO{chan} option in section ' + myInst.config.name
             else:
-                myInst.inst.write(f"INP{chan}:SLO {myInst.config['SLO'+chan]}")
+                myInst.inst.write(f"INP{chan}:SLOP {myInst.config['SLO'+chan]}")
                 str_header += '/' + myInst.config['SLO'+chan]
             str_header += '\n'
             
@@ -109,14 +108,17 @@ def apply_presets(myInst):
             return 'There is no CONF option in section ' + myInst.config.name
         else:
             myInst.inst.write('CONF:' + myInst.config['CONF'])
+        if myInst.config['CONF'] == 'FREQ':
+            myInst.inst.write(':FREQ:ARM:SOUR IMM')
+            myInst.inst.write(':FREQ:ARM:STOP:SOUR TIM')
+            myInst.inst.write(':FREQ:ARM:STOP:TIM 1')
+
+        if not myInst.config_section.has_option(myInst.config.name, 'CHAN'):
+            return 'There is no CHAN option in section ' + myInst.config.name
+        else:
+            chans = [myInst.config['CHAN'][0], myInst.config['CHAN'][-1]]
+            str_header += 'Configure/Ch = ' + myInst.config['CONF'] + '/' + myInst.config['CHAN'] + '\n'
         
-        if myInst.config['CONF'] == 'TINT':
-            if not myInst.config_section.has_option(myInst.config.name, 'CHAN'):
-                return 'There is no CHAN option in section ' + myInst.config.name
-            else:
-                chans = [myInst.config['CHAN'][0], myInst.config['CHAN'][-1]]
-                str_header += 'Configure/Ch = ' + myInst.config['CONF'] + '/' + myInst.config['CHAN'] + '\n'
-            
         for chan in chans:
             str_header += 'CH' + chan + '  Setting = '
             if not myInst.config_section.has_option(myInst.config.name, 'COUP'+chan):
@@ -151,22 +153,32 @@ def apply_presets(myInst):
         myInst.inst.write('*RST')
         myInst.inst.write('*CLS')
         myInst.inst.write('TENA 4')
-        myInst.inst.write('SIZE 1')
-        myInst.inst.write('SRCE 0')
         myInst.inst.write('*SRE 8')
 
         if not myInst.config_section.has_option(myInst.config.name, 'CONF'):
             return 'There is no CONF option in section ' + myInst.config.name
         else:
-            myInst.inst.write('CONF:' + myInst.config['CONF'])
-        
-        if myInst.config['CONF'] == 'TINT':
-            if not myInst.config_section.has_option(myInst.config.name, 'CHAN'):
-                return 'There is no CHAN option in section ' + myInst.config.name
-            else:
+            if myInst.config['CONF'] == 'FREQ':
+                myInst.inst.write('MODE 3')
+            elif myInst.config['CONF'] == 'TINT':
                 myInst.inst.write('MODE 0')
-                chans = [myInst.config['CHAN'][0], myInst.config['CHAN'][-1]]
-                str_header += 'Configure/Ch = ' + myInst.config['CONF'] + '/' + myInst.config['CHAN'] + '\n'
+        
+        if not myInst.config_section.has_option(myInst.config.name, 'CHAN'):
+            return 'There is no CHAN option in section ' + myInst.config.name
+        else:
+            if myInst.config['CHAN'] == '1':
+                myInst.inst.write('SRCE 0')
+            elif myInst.config['CHAN'] == '2':
+                myInst.inst.write('SRCE 1')
+            else:
+                myInst.inst.write('SRCE 0')
+        chans = [myInst.config['CHAN'][0], myInst.config['CHAN'][-1]]
+        str_header += 'Configure/Ch = ' + myInst.config['CONF'] + '/' + myInst.config['CHAN'] + '\n'
+
+        #myInst.inst.write('GATE 1')
+        myInst.inst.write('ARMM 5')
+        myInst.inst.write('SIZE 1')
+        myInst.inst.write('AUTM 1')
             
         for chan in chans:
             str_header += 'CH' + chan + '  Setting = '

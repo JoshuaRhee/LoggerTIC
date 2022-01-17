@@ -1,11 +1,9 @@
 #######################################
 # Time Interval Counter Logger
 # Device: 53230A, 53131A, 53132A, SR620
-# Version: 1.6
-# Modified apply_presets
-# Merged write_header to apply_presets
-# Modified meas. file header format
-# Added infinite option for 53230A
+# Version: 1.7
+# Additional instructions in apply_presets
+# Tested on 15 devices at once
 #######################################
 
 import configparser
@@ -58,18 +56,20 @@ class Instrument:
             elif self.config['INTERFACE'] == 'TCPIP_SOCKET':
                 return None
             elif self.config['INTERFACE'] == 'GPIB_INSTR':
-                try:
-                    GPIBaddr = self.config['ADDRESS']
-                    rm = pyvisa.ResourceManager()
-                    rm.list_resources()
-                    (f'GPIB0::{GPIBaddr}::INSTR')
-                    Instrument = rm.open_resource(f'GPIB0::{GPIBaddr}::INSTR')
-                    self.instModel = Instrument.query('*IDN?').split(',')[1]
-                    logger.info(f'@connect_inst: Connected to GPIB ({GPIBaddr}).')
-                    return Instrument
-                except:
-                    logger.error(f'@connect_inst: Failed to connect to GPIB ({GPIBaddr}).')
-                    return None
+                for i in range(3):
+                    try:
+                        GPIBaddr = self.config['ADDRESS']
+                        rm = pyvisa.ResourceManager()
+                        rm.list_resources()
+                        (f'GPIB0::{GPIBaddr}::INSTR')
+                        Instrument = rm.open_resource(f'GPIB0::{GPIBaddr}::INSTR')
+                        self.instModel = Instrument.query('*IDN?').split(',')[1]
+                        logger.info(f'@connect_inst: Connected to GPIB ({GPIBaddr}).')
+                        return Instrument
+                    except:
+                        pass
+                logger.error(f'@connect_inst: Failed to connect to GPIB ({GPIBaddr}). Trial [{str(i+1)}/3].')
+                return None
             elif self.config['INTERFACE'] == 'SERIAL_INSTR':
                 return None
             elif self.config['INTERFACE'] == 'ENET-SERIAL_INSTR':
@@ -92,8 +92,8 @@ class Instrument:
             if self.config_section.has_option('INST'+str(numInst), 'TIMESTAMP'):
                 self.timestamp = self.config['TIMESTAMP']
                 if self.timestamp not in ['SUP','DUP','SER']:
-                    self.timestamp='SUP'
-                    logger.warning('@apply_options: Improper TIMETAG option in .ini file. Set SUP as a default.')
+                    self.timestamp='DUP'
+                    logger.warning('@apply_options: Improper TIMETAG option in .ini file. Set DUP as a default.')
             else:
                 self.timestamp='SUP'
                 logger.warning('@apply_options: No TIMESTAMP option in .ini file. Set SUP as a default.')
@@ -172,8 +172,10 @@ class Instrument:
 
         elif self.instModel == 'SR620':
             stb = format(self.inst.stb, '08b')
-            if stb[4] == '1':
-                logger.debug('@check: STB[4] detected. (Measurement queue)')
+            #print(str(stb))
+            if stb[7] == '0':
+                #logger.debug('@check: STB[3] detected. (Measurement queue)')
+                logger.debug('@check: STB[7] == 0 detected. (READY:No meas are in progress)')
                 self.send_XAVG()
                 self.send_CLS()
             else:
@@ -317,7 +319,7 @@ def initInst():
     if config.has_option('GENERAL_OPTIONS', 'SELECT_INST'):
         sel_list_opt = config.get('GENERAL_OPTIONS', 'SELECT_INST')
         if sel_list_opt == 'ALL':
-            sel_id_list = [format(x, 'd') for x in range(N_SECTION)]
+            sel_section_list = [x for x in range(N_SECTION)]
         else:
             sel_id_list = sel_list_opt.split(',')
             sel_section_list = []
@@ -334,7 +336,7 @@ def initInst():
                 pass
     else:
         logger.info('@initInst: No SELECT_INST option in .ini file. Set ALL as a default.')
-        sel_id_list = [format(x, 'd') for x in range(N_SECTION)]
+        sel_section_list = [x for x in range(N_SECTION)]
 
     ## GENERAL OPTION : SET LOG LEVEL
     if config.has_option('GENERAL_OPTIONS', 'LOG_LEVEL'):
@@ -360,13 +362,13 @@ def initInst():
             MyInst.append(Instrument(config,i))
             if MyInst[-1].flag_init is False:
                 logger.error(f'@initInst: Failed to initialize MyInst[{str(i)}].')
-                return ([], sel_id_list, qint)
+                #return ([], sel_section_list, qint)
             else:
                 if MyInst[-1].start() is False:
                     logger.error(f'@initInst: Failed to start MyInst[{str(i)}].')
-                    return ([], sel_id_list, qint)
+                    #return ([], sel_section_list, qint)
         else:
-            pass#MyInst.append(None)
+            MyInst.append(None)
     return (MyInst, sel_section_list, qint)
 
 def measInst(MyInst, sel_section_list, qint):
@@ -382,16 +384,19 @@ def measInst(MyInst, sel_section_list, qint):
                 logger.debug('@measInst: Measurement loop is started.')
                 t.tic()
                 for i in sel_section_list:
-                    if MyInst[int(i)] is not None and MyInst[int(i)].flag_start:
-                        flag_OK, flag_reset_cnt = MyInst[int(i)].check(cnt_check)
-                        cnt_check += 1
-                        if flag_reset_cnt:
-                            cnt_check = 1
-                        cnt_serial_failures = 0
+                    if MyInst[i].inst is not None:
+                        if MyInst[i].flag_start:
+                            flag_OK, flag_reset_cnt = MyInst[i].check(cnt_check)
+                            cnt_check += 1
+                            if flag_reset_cnt:
+                                cnt_check = 1
+                            cnt_serial_failures = 0
+                        else:
+                            logger.critical('@measInst: MyInst[' + str(i) + '] is not working. (' + str(cnt_serial_failures) + ' serial failures)')
                     else:
                         cnt_serial_failures += 1
-                        logger.critical('@measInst: MyInst[' + i + '] is not working. (' + str(cnt_serial_failures) + ' serial failures)')
-                        if cnt_serial_failures >= 1000:
+                        logger.critical('@measInst: MyInst[' + str(i) + '] is not working. (' + str(cnt_serial_failures) + ' serial failures)')
+                        if cnt_serial_failures >= 10:
                             raise SystemExit
             else:
                 pass
@@ -411,7 +416,7 @@ if __name__ == '__main__':
     (MyInst, sel_section_list, qint) = initInst()
 
     ## Eternal loop that checks STB and saves measurements
-    if all(x.inst is None for x in MyInst):
+    if all(x is None for x in MyInst):
         logger.error('@initInst: Measurement is not started due to the fail in initialization.')
     else:
         measInst(MyInst, sel_section_list, qint)
