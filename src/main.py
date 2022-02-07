@@ -138,11 +138,12 @@ class Instrument:
                 self.send_CLS()
                 #self.send_READ()
                 self.send_R()
-                if self.flag_infinite is True and cnt_check > 1E8:
+                if self.flag_infinite is True and cnt_check > 9E5:
                     self.inst.write('ABOR')
                     self.inst.write('INIT')
                     logger.info('@check: Device is re-initialized for the infinite mode.')
                     return True, True
+                return True, False
             else:
                 pass
             # if stb[5] == '1': # Errors exist.
@@ -167,6 +168,7 @@ class Instrument:
                 logger.debug('@check: STB[0] detected. (Measurement queue)')
                 self.send_DATA()
                 self.send_CLS()
+                return True, False
             else:
                 logger.debug('@check: No STB detected.')
 
@@ -178,11 +180,12 @@ class Instrument:
                 logger.debug('@check: STB[7] == 0 detected. (READY:No meas are in progress)')
                 self.send_XAVG()
                 self.send_CLS()
+                return True, False
             else:
                 logger.debug('@check: No STB detected.')
         else:
             logger.error('@check: Unexpected model name.')
-        return True, False
+        return False, False
 
     def comp_reg(self, reg_prev, stb):
         reg_STB = f"{int(self.inst.query('*STB?')[1:-1]):b}".zfill(8)
@@ -374,22 +377,26 @@ def initInst():
 def measInst(MyInst, sel_section_list, qint):
     try:
         cnt_check = 1
+        cnt_first = 1
         cnt_serial_failures = 0
         t = TicToc()
         t.tic()
         logger.debug('@measInst: Measurement loop is started.')
-
+        
         while True:
-            if t.tocvalue() > qint:
+            if t.tocvalue() > qint or cnt_first == 1:
                 logger.debug('@measInst: Measurement loop is started.')
                 t.tic()
                 for i in sel_section_list:
                     if MyInst[i].inst is not None:
                         if MyInst[i].flag_start:
                             flag_OK, flag_reset_cnt = MyInst[i].check(cnt_check)
-                            cnt_check += 1
+                            if flag_OK:
+                                cnt_first = 0
+                                cnt_check += 1
                             if flag_reset_cnt:
                                 cnt_check = 1
+                                cnt_first = 1
                             cnt_serial_failures = 0
                         else:
                             logger.critical('@measInst: MyInst[' + str(i) + '] is not working. (' + str(cnt_serial_failures) + ' serial failures)')

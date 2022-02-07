@@ -107,7 +107,10 @@ def apply_presets(myInst):
         if not myInst.config_section.has_option(myInst.config.name, 'CONF'):
             return 'There is no CONF option in section ' + myInst.config.name
         else:
-            myInst.inst.write('CONF:' + myInst.config['CONF'])
+            # myInst.inst.write('CONF:' + myInst.config['CONF'])
+            chans = myInst.config['CHAN']
+            myInst.inst.write(f":CONF:{myInst.config['CONF']} (@{chans})")
+            str_header += 'Configure/Ch = ' + myInst.config['CONF'] + ' ' + myInst.config['CHAN'] + '\n'
         if myInst.config['CONF'] == 'FREQ':
             myInst.inst.write(':FREQ:ARM:SOUR IMM')
             myInst.inst.write(':FREQ:ARM:STOP:SOUR TIM')
