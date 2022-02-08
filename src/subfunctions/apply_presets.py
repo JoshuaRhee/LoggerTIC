@@ -114,7 +114,9 @@ def apply_presets(myInst):
         if myInst.config['CONF'] == 'FREQ':
             myInst.inst.write(':FREQ:ARM:SOUR IMM')
             myInst.inst.write(':FREQ:ARM:STOP:SOUR TIM')
-            myInst.inst.write(':FREQ:ARM:STOP:TIM 1')
+            myInst.inst.write(':FREQ:ARM:STOP:TIM 0.4')
+            
+            ###### Should be done later for TINT!!!
 
         if not myInst.config_section.has_option(myInst.config.name, 'CHAN'):
             return 'There is no CHAN option in section ' + myInst.config.name

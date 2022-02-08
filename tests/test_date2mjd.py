@@ -2,6 +2,11 @@ from datetime import date, timedelta
 from src.subfunctions.date2mjd import date2mjd
 import unittest
 
+##################### HOT TO TEST THIS CODE: #####################
+# Type "python -m unittest" at the root path in the terminal.
+# ex) D:\Program\Python TIC Logger\TIC_Logger> python -m unittest
+##################################################################
+
 def daterange(start_date, end_date):
     for n in range(int((end_date - start_date).days)):
         yield start_date + timedelta(n)

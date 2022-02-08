@@ -8,11 +8,11 @@
 
 import configparser
 from datetime import datetime, timedelta
+import time
 from subfunctions.apply_presets import apply_presets
 from subfunctions.date2mjd import date2mjd
 from subfunctions.make_logger import make_logger
 import os
-from pytictoc import TicToc
 import pyvisa
 
 class Instrument:
@@ -112,7 +112,6 @@ class Instrument:
     ## INITIATE MEASURING
     def start(self):
         try:
-            self.flag_start = False
             if self.instModel == '53230A':
                 self.inst.write('INIT')
                 self.flag_start = True
@@ -123,6 +122,7 @@ class Instrument:
                 self.flag_start = True
             else:
                 logger.error('@start: Unexpected model name.')
+                self.flag_start = False
         except:
             logger.error('@start: Failed to start ' + self.instModel +'.')
         return self.flag_start
@@ -133,10 +133,9 @@ class Instrument:
             reg_to_check = format(int(self.inst.query('STAT:OPER:COND?')[1:-1]), '016b')
             logger.debug('@check: STAT:OPER:COND is ' + reg_to_check)
 
-            if reg_to_check[-13] == '1':# or True # Number of the measurements is reached to the threshold (=READCNT).
+            if reg_to_check[-13] == '1':# Check if any measurement exists.
                 logger.debug('@check: STAT:OPER:COND[-13] is detected.')
                 self.send_CLS()
-                #self.send_READ()
                 self.send_R()
                 if self.flag_infinite is True and cnt_check > 9E5:
                     self.inst.write('ABOR')
@@ -164,6 +163,7 @@ class Instrument:
 
         elif self.instModel == '53132A' or self.instModel == '53131A':
             stb = format(self.inst.stb, '08b')
+            #print("STB is " + str(stb))
             if stb[0] == '1':
                 logger.debug('@check: STB[0] detected. (Measurement queue)')
                 self.send_DATA()
@@ -376,43 +376,35 @@ def initInst():
 
 def measInst(MyInst, sel_section_list, qint):
     try:
+        flag_first_meas = False
+        flag_meas_found = True
         cnt_check = 1
-        cnt_first = 1
-        cnt_serial_failures = 0
-        t = TicToc()
-        t.tic()
-        logger.debug('@measInst: Measurement loop is started.')
+        t0 = time.time()
+        t1 = t0
         
-        while True:
-            if t.tocvalue() > qint or cnt_first == 1:
-                logger.debug('@measInst: Measurement loop is started.')
-                t.tic()
+        while True: # Infinite loop
+            t2 = time.time()
+            if (t2 - t1) > qint or flag_first_meas:
                 for i in sel_section_list:
                     if MyInst[i].inst is not None:
                         if MyInst[i].flag_start:
-                            flag_OK, flag_reset_cnt = MyInst[i].check(cnt_check)
-                            if flag_OK:
-                                cnt_first = 0
+                            flag_meas_found, flag_reinit = MyInst[i].check(cnt_check)
+                            if flag_meas_found:
+                                flag_first_meas = False
+                                t1 = t0+int(t2-t0)
                                 cnt_check += 1
-                            if flag_reset_cnt:
+                            if flag_reinit:
+                                flag_first_meas = True
                                 cnt_check = 1
-                                cnt_first = 1
-                            cnt_serial_failures = 0
                         else:
-                            logger.critical('@measInst: MyInst[' + str(i) + '] is not working. (' + str(cnt_serial_failures) + ' serial failures)')
+                            logger.critical('@measInst: MyInst[' + str(i) + '] is not working. (MyInst[i].flag_start is False)')
                     else:
-                        cnt_serial_failures += 1
-                        logger.critical('@measInst: MyInst[' + str(i) + '] is not working. (' + str(cnt_serial_failures) + ' serial failures)')
-                        if cnt_serial_failures >= 10:
-                            raise SystemExit
+                        logger.critical('@measInst: MyInst[' + str(i) + '] is not working. (MyInst[i].inst is None)')
             else:
                 pass
 
     except (KeyboardInterrupt, SystemExit):
-        if cnt_serial_failures > 1000:
-            logger.info('@measInst: Program is terminated because over 1000 serial failures occured.')
-        else:
-            logger.info('@measInst: Program is terminated by an external keyboard input.')
+        logger.info('@measInst: Program is terminated by an external keyboard input.')
 
 ## MAIN FUNCTION
 if __name__ == '__main__':
