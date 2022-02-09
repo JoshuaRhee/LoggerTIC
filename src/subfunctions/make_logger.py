@@ -74,11 +74,11 @@ def make_logger(LOG_DIR='outputs/logs'):
     log_dir_abs = PKG_DIR + '/' +LOG_DIR
     if not os.path.exists(log_dir_abs):
         os.makedirs(log_dir_abs)
-    LOG_FILENAME = LOG_DIR + '/log'
+    #LOG_FILENAME = LOG_DIR + '/log'
     #file_handler = logging.handlers.TimedRotatingFileHandler(filename=LOG_FILENAME, when='midnight',interval=1, encoding='utf-8', utc=True)
     fileMaxByte = 1024 * 1024 * 200 # [MB]
     file_handler = DailyRotatingFileHandler(LOG_DIR, maxBytes=fileMaxByte)
-    file_handler.suffix = '%y%m%d.log'
+    file_handler.suffix = '%y%m%d.log.txt'
 
     console.setLevel(logging.INFO)
     file_handler.setLevel(logging.INFO)
