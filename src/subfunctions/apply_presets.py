@@ -114,7 +114,7 @@ def apply_presets(myInst):
         if myInst.config['CONF'] == 'FREQ':
             myInst.inst.write(':FREQ:ARM:SOUR IMM')
             myInst.inst.write(':FREQ:ARM:STOP:SOUR TIM')
-            myInst.inst.write(':FREQ:ARM:STOP:TIM 0.4')
+            myInst.inst.write(':FREQ:ARM:STOP:TIM 1') # 0.4
             
             ###### Should be done later for TINT!!!
 
