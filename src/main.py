@@ -12,6 +12,7 @@ import time
 from subfunctions.apply_presets import apply_presets
 from subfunctions.date2mjd import date2mjd
 from subfunctions.make_logger import make_logger
+from subfunctions.write_header import write_header
 import os
 import pyvisa
 
@@ -214,10 +215,16 @@ class Instrument:
     
     ## SEND A QUERY OR AN INSTRUCTION AND TREAT THE ANSWERS APPROPRIATELY
     def send_R(self):
+        write_header(self)
         fileName = 'outputs/measurements/MEAS_'+self.instID+'_'+datetime.utcnow().strftime('%y%m%d')+'.txt'
         with open(fileName, 'a+') as f:
             logger.info('> Sent an R? query to ' + self.instID + ' on:    ' + datetime.utcnow().strftime('%y/%m/%d %H:%M:%S.%f'))
-            ans = self.inst.query('R?') # 데이터 쿼리 요청
+            try:
+                ans = self.inst.query('R?') # 데이터 쿼리 요청
+            except:
+                logger.error(f'@send_R: Failed to receive an answer from {self.instID} on: {datetime.utcnow().strftime("%y/%m/%d %H:%M:%S.%f")}')
+                return False
+            t_rcv = datetime.utcnow()
             t_rcv = datetime.utcnow()
             if ans[0] == '#':
                 logger.info('< Received an answer from ' + self.instID + ' on: ' + t_rcv.strftime('%y/%m/%d %H:%M:%S.%f'))
@@ -250,10 +257,16 @@ class Instrument:
                 logger.warning('< Received unexpected answer on:'+ t_rcv.strftime('%y/%m/%d %H:%M:%S.%f'))
 
     def send_READ(self):
+        write_header(self)
         fileName = 'outputs/measurements/MEAS_'+self.instID+'_'+datetime.utcnow().strftime('%y%m%d')+'.txt'
         with open(fileName, 'a+') as f:
             logger.info('> Sent an READ? query to ' + self.instID + ' on:    ' + datetime.utcnow().strftime('%y/%m/%d %H:%M:%S.%f'))
-            ans = self.inst.query('READ?') # 데이터 쿼리 요청
+            try:
+                ans = self.inst.query('READ?') # 데이터 쿼리 요청
+            except:
+                logger.error(f'@send_READ: Failed to receive an answer from {self.instID} on: {datetime.utcnow().strftime("%y/%m/%d %H:%M:%S.%f")}')
+                return False
+            t_rcv = datetime.utcnow()
             t_rcv = datetime.utcnow()
             #if ans[0] == '#':
             logger.info('< Received an answer from ' + self.instID + ' on: ' + t_rcv.strftime('%y/%m/%d %H:%M:%S.%f'))
@@ -277,10 +290,16 @@ class Instrument:
         #     pass
 
     def send_DATA(self):
+        write_header(self)
         fileName = 'outputs/measurements/MEAS_'+self.instID+'_'+datetime.utcnow().strftime('%y%m%d')+'.txt'
         with open(fileName,'a+') as f:
             logger.info('> Sent an DATA? query to ' + self.instID + ' on: ' + datetime.utcnow().strftime('%y/%m/%d %H:%M:%S.%f'))
-            ans = self.inst.query('DATA?') # 데이터 쿼리 요청
+            try:
+                ans = self.inst.query('DATA?') # 데이터 쿼리 요청
+            except:
+                logger.error(f'@send_DATA: Failed to receive an answer from {self.instID} on: {datetime.utcnow().strftime("%y/%m/%d %H:%M:%S.%f")}')
+                return False
+            t_rcv = datetime.utcnow()
             t_rcv = datetime.utcnow()
             logger.info('< Received an answer from ' + self.instID + ' on: ' + t_rcv.strftime('%y/%m/%d %H:%M:%S.%f'))
             logger.info('* Return from ' + self.instID + ' = ' + ans[:-1])
@@ -288,10 +307,15 @@ class Instrument:
             f.write(ans[ans.find('+'):ans.find('E')+5]+'\n') # 리턴 내용 기록
 
     def send_XAVG(self):
+        write_header(self)
         fileName = 'outputs/measurements/MEAS_'+self.instID+'_'+datetime.utcnow().strftime('%y%m%d')+'.txt'
         with open(fileName,'a+') as f:
             logger.info('> Sent an XAVG? query to ' + self.instID + ' on: ' + datetime.utcnow().strftime('%y/%m/%d %H:%M:%S.%f'))
-            ans = self.inst.query('XAVG?') # 데이터 쿼리 요청
+            try:
+                ans = self.inst.query('XAVG?') # 데이터 쿼리 요청
+            except:
+                logger.error(f'@send_XAVG: Failed to receive an answer from {self.instID} on: {datetime.utcnow().strftime("%y/%m/%d %H:%M:%S.%f")}')
+                return False
             t_rcv = datetime.utcnow()
             logger.info('< Received an answer from ' + self.instID + ' on: ' + t_rcv.strftime('%y/%m/%d %H:%M:%S.%f'))
             logger.info('* Return from ' + self.instID + ' = ' + ans[:-1])

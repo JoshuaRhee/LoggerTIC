@@ -76,9 +76,9 @@ def make_logger(LOG_DIR='outputs/logs'):
         os.makedirs(log_dir_abs)
     #LOG_FILENAME = LOG_DIR + '/log'
     #file_handler = logging.handlers.TimedRotatingFileHandler(filename=LOG_FILENAME, when='midnight',interval=1, encoding='utf-8', utc=True)
-    fileMaxByte = 1024 * 1024 * 200 # [MB]
+    fileMaxByte = 1024 * 1024 * 50 # [MB]
     file_handler = DailyRotatingFileHandler(LOG_DIR, maxBytes=fileMaxByte)
-    file_handler.suffix = '%y%m%d.log.txt'
+    #file_handler.suffix = '%y%m%d.log.txt'
 
     console.setLevel(logging.INFO)
     file_handler.setLevel(logging.INFO)

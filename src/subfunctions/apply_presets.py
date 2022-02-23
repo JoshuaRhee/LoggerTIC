@@ -1,5 +1,6 @@
 from datetime import datetime
 from subfunctions.date2mjd import date2mjd
+from subfunctions.write_header import write_header
 import os
 
 def apply_presets(myInst):
@@ -223,21 +224,7 @@ def apply_presets(myInst):
     else:
         return 'This instrument model is not supported. (' + myInst.config.name + ')'
     
-    fileName = 'outputs/measurements/MEAS_'+myInst.instID+'_'+datetime.utcnow().strftime('%y%m%d')+'.txt'
-    if not os.path.exists(os.path.dirname(fileName)):
-        os.makedirs(os.path.dirname(fileName))
-        
-    with open(fileName, 'a+') as f:
-        if os.stat(fileName).st_size == 0:
-            f.write('<GPIB LOGGER OUTPUT>\n')
-            f.write('Reference Time = UTC\n')
-            datestr = datetime.utcnow().strftime('%Y-%m-%d')
-            f.write('Date = ' + datestr + '\n')
-            f.write('MJD/DOY = ' + date2mjd(datestr[0:4], datestr[5:7], datestr[8:10]) + '/' + str(datetime.utcnow().timetuple().tm_yday) +'\n')
-            f.write('File ID = ' + myInst.config['FILE_ID'] + '\n')
-            f.write('Device Model = ' + myInst.instModel + '\n')
-            f.write('Connect/Port = ' + myInst.config['INTERFACE'] + '/' + myInst.config['ADDRESS'] + '\n')
-            f.write(str_header)
-            f.write('\n')
-            f.write('MJD   HH:mm:ss.ss MEASUREMENT\n')
+    myInst.str_header = str_header
+    write_header(myInst)
+    
     return 'Done'
